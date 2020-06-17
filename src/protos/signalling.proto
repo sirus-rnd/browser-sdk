@@ -1,0 +1,217 @@
+syntax = "proto3";
+
+package protos;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+service RoomManagementService {
+  rpc RegisterUser(NewUserParam) returns (User) {}
+  rpc GetUser(GetUserParam) returns (User) {}
+  rpc GetUsers(PaginationParam) returns (Users) {}
+  rpc GetUserAccessToken(GetUserParam) returns (UserAccessToken) {}
+  rpc UpdateUserProfile(UpdateUserProfileParam) returns (User) {}
+  rpc RemoveUser(GetUserParam) returns (User) {}
+  rpc CreateRoom(NewRoomParam) returns (Room) {}
+  rpc GetRoom(GetRoomParam) returns (Room) {}
+  rpc GetRooms(PaginationParam) returns (Rooms) {}
+  rpc UpdateRoomProfile(UpdateRoomProfileParam) returns (Room) {}
+  rpc AddUserToRoom(UserRoomParam) returns (Room) {}
+  rpc KickUserFromRoom(UserRoomParam) returns (Room) {}
+  rpc DestroyRoom(GetRoomParam) returns (Room) {}
+}
+
+service SignalingService {
+  rpc GetProfile(google.protobuf.Empty) returns (Profile) {}
+  rpc UpdateProfile(UpdateProfileParam) returns (Profile) {}
+  rpc GetMyRooms(google.protobuf.Empty) returns (Rooms) {}
+  rpc GetRoom(GetRoomParam) returns (Room) {}
+  rpc GetUser(GetUserParam) returns (User) {}
+  rpc OfferSessionDescription(SDPParam) returns (google.protobuf.Empty) {}
+  rpc AnswerSessionDescription(SDPParam) returns (google.protobuf.Empty) {}
+  rpc SubscribeSDPCommand(google.protobuf.Empty) returns (stream SDP) {}
+  rpc SubscribeRoomEvent(google.protobuf.Empty) returns (stream RoomEvent) {}
+  rpc SendICECandidate(ICEParam) returns (google.protobuf.Empty) {}
+  rpc SubscribeICECandidate(google.protobuf.Empty) returns (stream ICEOffer) {}
+  rpc SubscribeOnlineStatus(stream Heartbeat) returns (stream OnlineStatus) {}
+}
+
+message NewUserParam {
+  string id = 1;
+  string name = 2;
+  string photo = 3;
+}
+
+message GetUserParam {
+  string id = 1;
+}
+
+message User {
+  string id = 1;
+  string name = 2;
+  string photo = 3;
+  bool online = 4;
+}
+
+message OnlineStatus {
+  string id = 1;
+  bool online = 2;
+}
+
+message Heartbeat {
+  bool beat = 2;
+}
+
+message Users {
+  repeated User users = 1;
+  uint64 count = 2;
+}
+
+message UpdateUserProfileParam {
+  string id = 1;
+  string name = 2;
+  string photo = 3;
+}
+
+message UpdateProfileParam {
+  string name = 2;
+  string photo = 3;
+}
+
+message Profile {
+  string id = 1;
+  string name = 2;
+  string photo = 3;
+  repeated ICEServer servers = 4;
+}
+
+enum ICECredentialType {
+  NONE = 0;
+  PASSWORD = 1;
+  OAUTH = 2;
+}
+
+message ICEServer {
+  string url = 1;
+  string username = 2;
+  ICECredentialType credentialType = 3;
+  string password = 4;
+  string accessToken = 5;
+  string macKey = 6;
+}
+
+message UserAccessToken {
+  string token = 1;
+}
+
+message NewRoomParam {
+  string id = 1;
+  string name = 2;
+  string photo = 3;
+  string description = 4;
+  repeated string userIDs = 5; 
+}
+
+message Room {
+  string id = 1;
+  string name = 2;
+  string photo = 3;
+  string description = 4;
+  repeated User users = 5; 
+}
+
+message UpdateRoomProfileParam {
+  string id = 1;
+  string name = 2;
+  string photo = 3;
+  string description = 4;
+}
+
+message Rooms {
+  repeated Room rooms = 1;
+  uint64 count = 2;
+}
+
+message UserRoomParam {
+  string userID = 1;
+  string roomID = 2;
+}
+
+message GetRoomParam {
+  string id = 1;
+}
+
+message PaginationParam {
+  int32 offset = 1; 
+  int32 limit = 2; 
+  string keyword = 3;
+}
+
+message SDPParam {
+  string description = 1;
+  string userID = 2;
+}
+
+message SDP {
+  SDPTypes type = 1;
+  string description = 2;
+  string senderID = 3;
+}
+
+enum SDPTypes {
+  Offer = 0;
+  Answer = 1;
+  Pranswer = 2;
+  Rollback = 3;
+}
+
+message RoomEvent {
+  RoomEvents event = 1;
+  google.protobuf.Timestamp time = 3;
+  oneof payload {
+    RoomParticipantEventPayload roomParticipant = 4;
+    RoomInstanceEventPayload roomInstance = 5;
+    UserInstanceEventPayload userInstance = 6;
+  }
+}
+
+enum RoomEvents {
+  UserLeftRoom = 0;
+  UserJoinedRoom = 1;
+  RoomCreated = 2;
+  RoomProfileUpdated = 3;
+  RoomDestroyed = 4;
+  UserRegistered = 5;
+  UserProfileUpdated = 6;
+  UserRemoved = 7;
+}
+
+message RoomParticipantEventPayload {
+  string participantID = 1;
+  string roomID = 2;
+}
+
+message RoomInstanceEventPayload {
+  string id = 1;
+  string name = 2;
+  string photo = 3;
+  string description = 4;
+}
+
+message UserInstanceEventPayload {
+  string id = 1;
+  string name = 2;
+  string photo = 3;
+}
+
+message ICEParam {
+  string candidate = 1;
+  string userID = 2;
+  bool isRemote = 3;
+}
+
+message ICEOffer {
+  string candidate = 1;
+  string senderID = 2;
+  bool isRemote = 3;
+}

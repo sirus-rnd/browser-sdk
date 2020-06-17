@@ -1,0 +1,71 @@
+lib-cov
+*.seed
+*.log
+*.csv
+*.dat
+*.out
+*.pid
+*.gz
+*.swp
+*.js.map
+*.pem
+*.key
+*.p12
+*.crt
+*.zip
+
+pids
+logs
+results
+tmp
+.tmp
+
+# Test report
+.nyc*
+coverage
+mochawesome-report
+
+# API keys and secrets
+.env
+creds
+
+# Dependency directory
+node_modules
+bower_components
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+.vscode
+
+# IDE - VSCode
+.vscode
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Ignore build files
+test/build
+dist/lib
+public
+bin
+
+# ignore leveldb
+db
+db-mock
+
+log.txt
+
+#ignore binary file
+*.exe
+*.pem
+*.crx
+
+# tls
+.sentryclirc
