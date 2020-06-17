@@ -4,31 +4,20 @@
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "module": "commonjs",
-    "target": "es2017",
+    "target": "ES5",
     "declaration": true,
     "moduleResolution": "node",
     "emitDecoratorMetadata": true,
     "strict": false,
     "experimentalDecorators": true,
-    "lib": [
-      "dom",
-      "es2017",
-      "esnext.asynciterable"
-    ],
+    "lib": ["dom", "ES5", "esnext.asynciterable"],
     "sourceMap": true,
     "inlineSourceMap": false,
     "rootDir": "./src",
     "outDir": "./dist/lib",
     "baseUrl": ".",
-    "typeRoots": [
-      "node_modules/@types",
-      "src/@types",
-    ],
-    "types" : ["@types/jest", "@types/node"],
+    "typeRoots": ["node_modules/@types", "src/@types"],
+    "types": ["@types/jest", "@types/node"]
   },
-  "exclude": [
-    "node_modules",
-    "test",
-    "dist"
-  ]
+  "exclude": ["node_modules", "test", "dist"]
 }

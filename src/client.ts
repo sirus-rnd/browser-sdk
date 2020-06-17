@@ -1,4 +1,3 @@
-import * as LocalForage from 'localforage';
 import { grpc } from '@improbable-eng/grpc-web';
 import { ProtobufMessage } from '@improbable-eng/grpc-web/dist/typings/message';
 import { Observable, merge, Subject } from 'rxjs';
@@ -82,7 +81,7 @@ export class ChatClient implements IChatClient {
 
   constructor(
     private signaling: SignalingServiceClient,
-    private storage: LocalForage,
+    private storage: any,
     private conversationManager: IConversationStateManager,
     private messenger: IMessenger,
     private logger: Consola

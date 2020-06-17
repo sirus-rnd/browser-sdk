@@ -1,7 +1,7 @@
-import consola, { LogLevel } from 'consola';
+import { LogLevel, Consola, BrowserReporter } from 'consola';
 import { createInstance, INDEXEDDB, LOCALSTORAGE, WEBSQL } from 'localforage';
-import { ConversationManager } from './/conversation-state';
-import { ChatClient } from './/client';
+import { ConversationManager } from './conversation-state';
+import { ChatClient } from './client';
 import { Messenger } from './messaging';
 import { SignalingServiceClient } from './protos/SignallingServiceClientPb';
 
@@ -52,6 +52,9 @@ export async function createNewClient(
   const conversationManager = new ConversationManager();
   await conversationManager.init();
   // setup logger
+  const consola = new Consola({
+    reporters: [new BrowserReporter()],
+  });
   consola.level = mapP2PLogLevelToConsola[logLevel] || LogLevel.Error;
   // setup messenger
   const messenger = new Messenger(conversationManager, consola);
