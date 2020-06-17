@@ -1,7 +1,8 @@
 {
-  "name": "p2pchat-browser-sdk",
-  "version": "1.0.0",
-  "description": "library to develop p2p chat client on browser",
+  "name": "p2pchat-browser-sdk-dev",
+  "version": "0.0.1",
+  "private": true,
+  "description": "development library to develop SDK for p2p chat client on browser",
   "author": "muhammad hasan <hasan@lussa.net>",
   "main": "src/index.ts",
   "license": "GPL-3.0",
