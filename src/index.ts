@@ -5,6 +5,9 @@ import { ChatClient } from './/client';
 import { Messenger } from './messaging';
 import { SignalingServiceClient } from './protos/SignallingServiceClientPb';
 
+// export p2p chat interface
+export * from './p2p-chat';
+
 export interface P2PChatOptions {
   signalingUrl: string;
   logLevel: P2PLogLevel;

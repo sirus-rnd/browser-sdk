@@ -10,8 +10,9 @@
     "chat"
   ],
   "scripts": {
+    "deploy": "npm publish ./dist --access public",
     "lint": "tslint -c tslint.json -p tsconfig.json",
-    "prebuild": "rimraf ./dist",
+    "prebuild": "rimraf ./dist/lib",
     "build": "tsc",
     "test": "jest",
     "proto": "protoc -I=./src/protos signalling.proto --js_out=import_style=commonjs:./src/protos  --grpc-web_out=import_style=typescript,mode=grpcwebtext:./src/protos",

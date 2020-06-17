@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "library to develop p2p chat client on browser",
   "author": "muhammad hasan <hasan@lussa.net>",
+  "main": "src/index.ts",
   "license": "GPL-3.0",
-  "main": "lib/index.js",
   "keywords": [
     "p2p",
     "chat"
