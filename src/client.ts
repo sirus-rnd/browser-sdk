@@ -33,6 +33,7 @@ import {
   GetUserParam,
   Heartbeat,
 } from './protos/signalling_pb';
+import { delay } from 'bluebird';
 
 export const ACCESS_KEY = 'access-token';
 
@@ -128,23 +129,6 @@ export class ChatClient implements IChatClient {
 
   async reconnect(): Promise<void> {
     const userIds = Object.keys(this.channels);
-    // reconnect signalling channel
-    if (this.sdpCommandSub) {
-      this.sdpCommandSub.close();
-    }
-    if (this.iceOfferSub) {
-      this.iceOfferSub.close();
-    }
-    if (this.heartbeatTimeout) {
-      clearInterval(this.heartbeatTimeout);
-    }
-    if (this.onlineStatusClient) {
-      this.onlineStatusClient.finishSend();
-    }
-    await this.initSDPSignal();
-    await this.initICEOfferSignal();
-    await this.initOnlineStatus();
-
     // reconn to each channels
     this.profile.online = false;
     await Promise.all(
@@ -655,9 +639,13 @@ export class ChatClient implements IChatClient {
       }
     });
     this.onlineStatusClient.onEnd(
-      (code: grpc.Code, msg: string | undefined, _: grpc.Metadata) => {
+      async (code: grpc.Code, msg: string | undefined, _: grpc.Metadata) => {
         if (code !== grpc.Code.OK) {
-          throw new Error(msg);
+          this.logger.error('online status subscription closed', msg);
+          // try to reconnect
+          this.logger.debug('online status subscription closing, try to reconnect in 2 sec.');
+          await delay(2000);
+          await this.initOnlineStatus();
         }
       }
     );
@@ -682,9 +670,13 @@ export class ChatClient implements IChatClient {
         const id = payload.senderid;
         this.channels[id].onICEOfferSignal(payload);
       },
-      onEnd: (code: grpc.Code, msg: string | undefined, _: grpc.Metadata) => {
+      onEnd: async (code: grpc.Code, msg: string | undefined, _: grpc.Metadata) => {
         if (code !== grpc.Code.OK) {
-          throw new Error(msg);
+          this.logger.error('ICE offer signal closed', msg);
+          // try to reconnect
+          this.logger.debug('ICE offer signal listener closing, try to reconnect in 2 sec.');
+          await delay(2000);
+          await this.initICEOfferSignal();
         }
       },
       transport: grpc.WebsocketTransport(),
@@ -703,9 +695,13 @@ export class ChatClient implements IChatClient {
         const id = payload.senderid;
         this.channels[id].onReceiveSDP(payload);
       },
-      onEnd: (code: grpc.Code, msg: string | undefined, _: grpc.Metadata) => {
+      onEnd: async (code: grpc.Code, msg: string | undefined, _: grpc.Metadata) => {
         if (code !== grpc.Code.OK) {
-          throw new Error(msg);
+          this.logger.error('SDP signal closed', msg);
+          // try to reconnect
+          this.logger.debug('SDP signal listener closing, try to reconnect in 2 sec.');
+          await delay(2000);
+          await this.initSDPSignal();
         }
       },
       transport: grpc.WebsocketTransport(),
@@ -828,9 +824,13 @@ export class ChatClient implements IChatClient {
           }
         }
       },
-      onEnd: (code: grpc.Code, msg: string | undefined, _: grpc.Metadata) => {
+      onEnd: async (code: grpc.Code, msg: string | undefined, _: grpc.Metadata) => {
         if (code !== grpc.Code.OK) {
-          throw new Error(msg);
+          this.logger.error('room event listener closed', msg);
+          // try to reconnect
+          this.logger.debug('room event listener closing, try to reconnect in 2 sec.');
+          await delay(2000);
+          await this.handleRoomEvents();
         }
       },
       transport: grpc.WebsocketTransport(),
