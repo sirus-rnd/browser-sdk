@@ -208,9 +208,6 @@ export class ChatClient implements IChatClient {
       this.makeChannels(this.rooms),
     ]);
 
-    // wait a bit before make offer
-    await delay(3000);
-
     // connect to each user on the rooms
     await Promise.all(
       Object.keys(this.channels).map((id) => {
@@ -645,7 +642,7 @@ export class ChatClient implements IChatClient {
         if (code !== grpc.Code.OK) {
           this.logger.error('online status subscription closed', msg);
           // try to reconnect
-          this.logger.debug(
+          this.logger.info(
             'online status subscription closing, try to reconnect in 2 sec.'
           );
           await delay(2000);
@@ -682,7 +679,7 @@ export class ChatClient implements IChatClient {
         if (code !== grpc.Code.OK) {
           this.logger.error('ICE offer signal closed', msg);
           // try to reconnect
-          this.logger.debug(
+          this.logger.info(
             'ICE offer signal listener closing, try to reconnect in 2 sec.'
           );
           await delay(2000);
@@ -696,31 +693,41 @@ export class ChatClient implements IChatClient {
   private async initSDPSignal() {
     this.logger.info('initiate SDP signalling');
     const token = await this.getAccessToken();
-    this.sdpCommandSub = grpc.invoke(SignalingService.SubscribeSDPCommand, {
-      request: new Empty(),
-      host: this.signaling.hostname_,
-      metadata: { token },
-      onMessage: (data: SDP) => {
-        const payload = data.toObject();
-        const id = payload.senderid;
-        this.channels[id].onReceiveSDP(payload);
-      },
-      onEnd: async (
-        code: grpc.Code,
-        msg: string | undefined,
-        _: grpc.Metadata
-      ) => {
-        if (code !== grpc.Code.OK) {
-          this.logger.error('SDP signal closed', msg);
-          // try to reconnect
-          this.logger.debug(
-            'SDP signal listener closing, try to reconnect in 2 sec.'
-          );
-          await delay(2000);
-          await this.initSDPSignal();
-        }
-      },
-      transport: grpc.WebsocketTransport(),
+    return new Promise((resolve, reject) => {
+      this.sdpCommandSub = grpc.invoke(SignalingService.SubscribeSDPCommand, {
+        request: new Empty(),
+        host: this.signaling.hostname_,
+        metadata: { token },
+        onMessage: (data: SDP) => {
+          const payload = data.toObject();
+          // ignore ACK message
+          if (!payload.senderid) {
+            return;
+          }
+          const id = payload.senderid;
+          this.channels[id].onReceiveSDP(payload);
+        },
+        onHeaders: (headers: grpc.Metadata) => {
+          // ack from server
+          resolve();
+        },
+        onEnd: async (
+          code: grpc.Code,
+          msg: string | undefined,
+          _: grpc.Metadata
+        ) => {
+          if (code !== grpc.Code.OK) {
+            this.logger.error('SDP signal closed', msg);
+            // try to reconnect
+            this.logger.info(
+              'SDP signal listener closing, try to reconnect in 2 sec.'
+            );
+            await delay(2000);
+            await this.initSDPSignal();
+          }
+        },
+        transport: grpc.WebsocketTransport(),
+      });
     });
   }
 
@@ -848,7 +855,7 @@ export class ChatClient implements IChatClient {
         if (code !== grpc.Code.OK) {
           this.logger.error('room event listener closed', msg);
           // try to reconnect
-          this.logger.debug(
+          this.logger.info(
             'room event listener closing, try to reconnect in 2 sec.'
           );
           await delay(2000);
