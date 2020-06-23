@@ -1,6 +1,6 @@
 {
   "name": "@sirusdev/p2pchat-browser-sdk",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "library to develop p2p chat client on browser",
   "author": "muhammad hasan <hasan@lussa.net>",
   "license": "GPL-3.0",

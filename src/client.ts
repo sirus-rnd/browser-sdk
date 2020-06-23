@@ -1,5 +1,6 @@
 import { grpc } from '@improbable-eng/grpc-web';
 import { ProtobufMessage } from '@improbable-eng/grpc-web/dist/typings/message';
+import { delay } from 'bluebird';
 import { Observable, merge, Subject } from 'rxjs';
 import { v4 as uuid } from 'uuid';
 import { Consola } from 'consola';
@@ -33,7 +34,6 @@ import {
   GetUserParam,
   Heartbeat,
 } from './protos/signalling_pb';
-import { delay } from 'bluebird';
 
 export const ACCESS_KEY = 'access-token';
 
@@ -196,18 +196,20 @@ export class ChatClient implements IChatClient {
       });
     });
 
-    // subscribe room event to update user & room state
-    await this.handleRoomEvents();
+    await Promise.all([
+      // subscribe room event to update user & room state
+      this.handleRoomEvents(),
+      // make channels & intiate SDP signaling
+      this.initSDPSignal(),
+      this.initICEOfferSignal(),
+      // now we are online
+      this.initOnlineStatus(),
+      // make channels
+      this.makeChannels(this.rooms),
+    ]);
 
-    // make channels & intiate SDP signaling
-    await this.initSDPSignal();
-    await this.initICEOfferSignal();
-    await this.initOnlineStatus();
-
-    // make channels
-    await this.makeChannels(this.rooms);
-    this.logger.debug('finish make channel');
-    this.logger.debug('list of channel', Object.keys(this.channels));
+    // wait a bit before make offer
+    await delay(3000);
 
     // connect to each user on the rooms
     await Promise.all(
@@ -643,7 +645,9 @@ export class ChatClient implements IChatClient {
         if (code !== grpc.Code.OK) {
           this.logger.error('online status subscription closed', msg);
           // try to reconnect
-          this.logger.debug('online status subscription closing, try to reconnect in 2 sec.');
+          this.logger.debug(
+            'online status subscription closing, try to reconnect in 2 sec.'
+          );
           await delay(2000);
           await this.initOnlineStatus();
         }
@@ -670,11 +674,17 @@ export class ChatClient implements IChatClient {
         const id = payload.senderid;
         this.channels[id].onICEOfferSignal(payload);
       },
-      onEnd: async (code: grpc.Code, msg: string | undefined, _: grpc.Metadata) => {
+      onEnd: async (
+        code: grpc.Code,
+        msg: string | undefined,
+        _: grpc.Metadata
+      ) => {
         if (code !== grpc.Code.OK) {
           this.logger.error('ICE offer signal closed', msg);
           // try to reconnect
-          this.logger.debug('ICE offer signal listener closing, try to reconnect in 2 sec.');
+          this.logger.debug(
+            'ICE offer signal listener closing, try to reconnect in 2 sec.'
+          );
           await delay(2000);
           await this.initICEOfferSignal();
         }
@@ -695,11 +705,17 @@ export class ChatClient implements IChatClient {
         const id = payload.senderid;
         this.channels[id].onReceiveSDP(payload);
       },
-      onEnd: async (code: grpc.Code, msg: string | undefined, _: grpc.Metadata) => {
+      onEnd: async (
+        code: grpc.Code,
+        msg: string | undefined,
+        _: grpc.Metadata
+      ) => {
         if (code !== grpc.Code.OK) {
           this.logger.error('SDP signal closed', msg);
           // try to reconnect
-          this.logger.debug('SDP signal listener closing, try to reconnect in 2 sec.');
+          this.logger.debug(
+            'SDP signal listener closing, try to reconnect in 2 sec.'
+          );
           await delay(2000);
           await this.initSDPSignal();
         }
@@ -824,11 +840,17 @@ export class ChatClient implements IChatClient {
           }
         }
       },
-      onEnd: async (code: grpc.Code, msg: string | undefined, _: grpc.Metadata) => {
+      onEnd: async (
+        code: grpc.Code,
+        msg: string | undefined,
+        _: grpc.Metadata
+      ) => {
         if (code !== grpc.Code.OK) {
           this.logger.error('room event listener closed', msg);
           // try to reconnect
-          this.logger.debug('room event listener closing, try to reconnect in 2 sec.');
+          this.logger.debug(
+            'room event listener closing, try to reconnect in 2 sec.'
+          );
           await delay(2000);
           await this.handleRoomEvents();
         }

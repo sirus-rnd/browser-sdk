@@ -1,5 +1,5 @@
 import { Observable, Subject } from 'rxjs';
-import { delay, race } from 'bluebird';
+import { delay, race, defer } from 'bluebird';
 import { Consola } from 'consola';
 import { v4 as uuid } from 'uuid';
 import { Conversation, UserInRoomEventPayload, FileContent } from './p2p-chat';
@@ -59,7 +59,6 @@ export class UserChannel {
     this.localConnection = new RTCPeerConnection({
       iceServers: this.iceServers,
     });
-    this.sendChannel = this.localConnection.createDataChannel(uuid());
     this.localConnection.addEventListener(
       'icecandidate',
       this.onLocalICECandidate.bind(this)
@@ -72,6 +71,8 @@ export class UserChannel {
       'negotiationneeded',
       this.onLocalNegotiationNeeded.bind(this)
     );
+    // create send channel
+    this.sendChannel = this.localConnection.createDataChannel(uuid());
     // update connection status
     this.sendChannel.addEventListener(
       'error',
@@ -87,8 +88,12 @@ export class UserChannel {
     );
   }
 
-  async reconnect() {
-    await this.disconnectSendChannel();
+  reconnect() {
+    // cannot reconnect when user are offline
+    if (!this.online) {
+      return;
+    }
+    this.disconnectSendChannel();
     this.connect();
   }
 
@@ -134,9 +139,16 @@ export class UserChannel {
 
   async onICEOfferSignal(payload: ICEOffer.AsObject) {
     const candidate: RTCIceCandidate = JSON.parse(payload.candidate);
-    this.logger.debug('receive ICE candidate for', this.id, candidate);
+    this.logger.debug('receive ICE candidate for', this.id, payload);
     try {
       if (payload.isremote) {
+        // wait answer before add ICE candidate
+        await race([
+          this.waitSDPAnswer(),
+          delay(5000).then(() => {
+            throw new Error('timeout wait SDP answer');
+          }),
+        ]);
         this.localConnection.addIceCandidate(candidate);
       } else {
         // wait for 5 sec. for remote connection to ready
@@ -151,6 +163,14 @@ export class UserChannel {
     } catch (err) {
       this.logger.error(err);
     }
+  }
+
+  async waitSDPAnswer(): Promise<boolean> {
+    if (!this.localConnection.currentRemoteDescription) {
+      await delay(5000);
+      return this.waitSDPAnswer();
+    }
+    return true;
   }
 
   async waitRemoteConnection(): Promise<boolean> {
@@ -171,16 +191,16 @@ export class UserChannel {
         this.logger.debug('receive offer', payload);
         // setup receive channel
         this.setupReceiveChannel();
-        this.remoteConnection.setRemoteDescription(offer);
+        await this.remoteConnection.setRemoteDescription(offer);
 
         // create answer
         const answer = await this.remoteConnection.createAnswer();
-        this.logger.debug('send answer', answer);
-        this.remoteConnection.setLocalDescription(answer);
+        await this.remoteConnection.setLocalDescription(answer);
         const param = new SDPParam();
         param.setUserid(this.id);
         param.setDescription(answer.sdp);
         const token = this.signalingToken;
+        this.logger.debug('sending answer', answer);
         await new Promise((resolve, reject) => {
           this.signaling.answerSessionDescription(
             param,
@@ -202,7 +222,7 @@ export class UserChannel {
           sdp: payload.description,
         };
         this.logger.debug('receive answer', payload);
-        this.localConnection.setRemoteDescription(answer);
+        await this.localConnection.setRemoteDescription(answer);
         break;
       }
     }
@@ -274,7 +294,7 @@ export class UserChannel {
   async onLocalNegotiationNeeded(event: Event) {
     // create SDP offers
     const offer = await this.localConnection.createOffer();
-    this.localConnection.setLocalDescription(offer);
+    await this.localConnection.setLocalDescription(offer);
     this.logger.debug('send offer', JSON.stringify(offer.sdp, null, 2));
     const param = new SDPParam();
     param.setUserid(this.id);
@@ -315,116 +335,15 @@ export class UserChannel {
     });
   }
 
-  async disconnectSendChannel() {
+  disconnectSendChannel() {
     if (this.sendChannel) {
-      await new Promise((resolve, reject) => {
-        this.sendChannel.close();
-        const onClose = () => {
-          this.sendChannel.removeEventListener('close', onClose);
-          resolve();
-        };
-        const onError = (err: RTCErrorEvent) => {
-          this.sendChannel.removeEventListener('error', onError);
-          reject(err.error);
-        };
-        this.sendChannel.addEventListener('close', onClose);
-        this.sendChannel.addEventListener('error', onError);
-      });
-      // update connection status
-      this.sendChannel.removeEventListener('error', this.onSendChannelError);
-      this.sendChannel.removeEventListener('open', this.onSendChannelOpen);
-      this.sendChannel.removeEventListener('close', this.onSendChannelClose);
-    }
-    if (this.localConnection) {
-      await new Promise((resolve, reject) => {
-        this.localConnection.close();
-        const onClose = () => {
-          this.localConnection.removeEventListener('close', onClose);
-          resolve();
-        };
-        const onError = (err: RTCErrorEvent) => {
-          this.localConnection.removeEventListener('error', onError);
-          reject(err.error);
-        };
-        this.localConnection.addEventListener('close', onClose);
-        this.localConnection.addEventListener('error', onError);
-      });
-      // clean up some listeners
-      this.localConnection.removeEventListener(
-        'icecandidate',
-        this.onLocalICECandidate
-      );
-      this.localConnection.removeEventListener(
-        'iceconnectionstatechange',
-        this.onLocalICEStateChange
-      );
-      this.localConnection.removeEventListener(
-        'negotiationneeded',
-        this.onLocalNegotiationNeeded
-      );
+      this.sendChannel.close();
     }
   }
 
-  async disconnectReceivingChannel() {
-    if (this.remoteConnection) {
-      await new Promise((resolve, reject) => {
-        this.remoteConnection.close();
-        const onClose = () => {
-          this.remoteConnection.removeEventListener('close', onClose);
-          resolve();
-        };
-        const onError = (err: RTCErrorEvent) => {
-          this.remoteConnection.removeEventListener('error', onError);
-          reject(err.error);
-        };
-        this.remoteConnection.addEventListener('close', onClose);
-        this.remoteConnection.addEventListener('error', onError);
-      });
-      // clean up some listeners
-      this.remoteConnection.removeEventListener(
-        'icecandidate',
-        this.onRemoteICECandidate.bind(this)
-      );
-      this.remoteConnection.removeEventListener(
-        'iceconnectionstatechange',
-        this.onRemoteICEStateChange.bind(this)
-      );
-      this.remoteConnection.removeEventListener(
-        'datachannel',
-        this.onReceiveDataChannel.bind(this)
-      );
-    }
+  disconnectReceivingChannel() {
     if (this.receiveChannel) {
-      await new Promise((resolve, reject) => {
-        this.receiveChannel.close();
-        const onClose = () => {
-          this.receiveChannel.removeEventListener('close', onClose);
-          resolve();
-        };
-        const onError = (err: RTCErrorEvent) => {
-          this.receiveChannel.removeEventListener('error', onError);
-          reject(err.error);
-        };
-        this.receiveChannel.addEventListener('close', onClose);
-        this.receiveChannel.addEventListener('error', onError);
-      });
-      // clean up some listeners
-      this.receiveChannel.removeEventListener(
-        'error',
-        this.onReceiveChannelError.bind(this)
-      );
-      this.receiveChannel.removeEventListener(
-        'open',
-        this.onReceiveChannelOpen.bind(this)
-      );
-      this.receiveChannel.removeEventListener(
-        'close',
-        this.onReceiveChannelClose.bind(this)
-      );
-      this.receiveChannel.removeEventListener(
-        'message',
-        this.onReceiveChannelGetMessage.bind(this)
-      );
+      this.receiveChannel.close();
     }
   }
 }
